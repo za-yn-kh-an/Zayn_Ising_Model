@@ -22,7 +22,7 @@ def initial_state(L):
         Defines the size of the lattice sides.
     """
     
-    """
+    
     lattice_points = np.zeros((L,L))
     up_or_down = [-1,1]
 
@@ -30,11 +30,13 @@ def initial_state(L):
     for i in range(L):
         for j in range(L):
             lattice_points[i,j] = random.choice(up_or_down)
+    
+    """
+    lattice_points = np.ones((L,L))
     """
     
-    lattice_points = np.ones((L,L))
-    
     return lattice_points, L
+    
 
 def Hamiltonian(lattice_points, L, T):
     """
@@ -59,7 +61,7 @@ def Hamiltonian(lattice_points, L, T):
     """
     #k = Boltzmann
     k = 1
-    H = 0; J = 1
+    delta_H = 0; J = 1
     
     
     for i in range(L):
@@ -78,10 +80,10 @@ def Hamiltonian(lattice_points, L, T):
             else: 
                 below = lattice_points[i, j+1]
                 
-            H += J * reference_point * (above+below+right+left) #J is ang. mom. (high J means less magnetisation)
-            w = np.exp(-H/(k*T))
+            delta_H += -J * reference_point * (above+below+right+left) #J is ang. mom. (high J means less magnetisation)
+            w = np.exp(-delta_H/(k*T))
                     
-    return H, w
+    return delta_H, w
 
 
 
@@ -108,7 +110,6 @@ def metropolis(L,reps, T):
         DESCRIPTION.
     N : INT
         Number of iterations the model has gone through.
-
     """
     sum_A = 0
     z = 0
@@ -126,50 +127,51 @@ def metropolis(L,reps, T):
     sum_w += w
     
     A = sum(sum(lattice_points))/(L**2)
+    #print(A)
     sum_A += A; z +=1 ; N +=1
     
     for k in range(reps):
         i = random.randint(0, L) - 1; j = random.randint(0, L) - 1
         lattice_points[i,j] = -1 * lattice_points[i,j]
         H,w = Hamiltonian(lattice_points, L, T)
-        
+        new_A = sum(sum(lattice_points))/(L**2) 
         #print(w/sum_w)
         
-        if w/sum_w >= 0.2:
-            sum_A += A ; z += 1 ; N +=1
+        if H <= 0:
+            sum_A += new_A ; z += 1 ; N +=1
             H_list.append(H)
             sum_w += w
-        
-    return sum_A, z, N
+        elif H > 0 and w >= 0.5:
+            sum_A += new_A ; z += 1 ; N +=1
+            H_list.append(H)
+            sum_w += w
+        else: lattice_points[i,j] = -1 * lattice_points[i,j]; N += 1 
+    
+    observed_A = sum_A/N   
+    
+    return observed_A, z, N
 
+""" FIX ACCEPTANCE CONDITION """
 
-
-T = np.arange(0.2,3.2,0.2)
+T = np.arange(0.5,3,0.2)
 T_len = len(T)
-"""
-A = np.zeros(15)
-reps = 1000
-for i in range(15):
+
+
+A = np.zeros(T_len)
+std = np.zeros(T_len)
+reps = 10
+for i in range(T_len):
+    B = np.zeros(reps)
     for j in range(reps):
-        A[i] += (metropolis(4, 1000, T[i])[0])
-    A[i] = A[i]/reps
-#myInt = 100
-#new_A = [x / myInt for x in A]
-"""
-
-#%%
-
-C = np.zeros(T_len)
-reps = 1000
-for j in range(reps):
-    B = np.zeros(T_len)
-    for i in range(T_len):
-        B[i] += (metropolis(4, 1000, T[i])[0])
-    C = C + B
-A = np.divide(C,reps)
+        B[j] += (metropolis(20, 20000, T[i])[0])
+    A[i] = np.mean(B)
+    std[i] = np.std(B)
 
 
 
 plt.plot(T,A)
 plt.xlabel("Temperature")
-plt.ylabel("Magnetisation Density")
+plt.ylabel("Magnetisation density")
+plt.errorbar(T, A, std)
+plt.vlines(2.26, 0, 1, colors = "r", linestyles = "--", label = "Expected Critical Temperature")
+plt.title("Temperature vs. Magnetisation Density")
