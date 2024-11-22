@@ -25,7 +25,6 @@ def initial_state(L):
     
     lattice_points = np.zeros((L,L))
     up_or_down = [-1,1]
-
     
     for i in range(L):
         for j in range(L):
@@ -61,7 +60,7 @@ def Hamiltonian(lattice_points, L, T):
     """
     #k = Boltzmann
     k = 1
-    delta_H = 0; J = 1
+    energy = 0; J = 1
     
     
     for i in range(L):
@@ -80,10 +79,10 @@ def Hamiltonian(lattice_points, L, T):
             else: 
                 below = lattice_points[i, j+1]
                 
-            delta_H += -J * reference_point * (above+below+right+left) #J is ang. mom. (high J means less magnetisation)
-            w = np.exp(-delta_H/(k*T))
+            energy += -J * reference_point * (above+below+right+left) #J is ang. mom. (high J means less magnetisation)
+            weight = np.exp(-energy/(k*T))
                     
-    return delta_H, w
+    return energy, weight
 
 
 
@@ -111,51 +110,54 @@ def metropolis(L,reps, T):
     N : INT
         Number of iterations the model has gone through.
     """
-    sum_A = 0
-    z = 0
+    sum_mag_density = 0
+    partition_function = 0
     N = 0
     H_list = []
-    sum_w = 0
+    sum_weight = 0
     
     lattice_points, length = initial_state(L)
-    H,w = Hamiltonian(lattice_points, length, T)
+    initial_energy, weight = Hamiltonian(lattice_points, length, T)
     
     #print(H)
     #print(w)
     
-    H_list.append(H)
-    sum_w += w
+    #H_list.append(energy)
     
-    A = sum(sum(lattice_points))/(L**2)
+    sum_weight += weight
+    
+    initial_mag_density = sum(sum(lattice_points))/(L**2)
     #print(A)
-    sum_A += A; z +=1 ; N +=1
+    sum_mag_density += initial_mag_density; partition_function += 1 ; N += 1
     
     for k in range(reps):
-        i = random.randint(0, L) - 1; j = random.randint(0, L) - 1
+        i = random.randint(0, L-1); j = random.randint(0, L-1)
         lattice_points[i,j] = -1 * lattice_points[i,j]
-        H,w = Hamiltonian(lattice_points, L, T)
-        new_A = sum(sum(lattice_points))/(L**2) 
+        new_energy, weight = Hamiltonian(lattice_points, L, T)
+        new_mag_density = sum(sum(lattice_points))/(L**2) 
         #print(w/sum_w)
         
-        if H <= 0:
-            sum_A += new_A ; z += 1 ; N +=1
-            H_list.append(H)
-            sum_w += w
-        elif H > 0 and w >= 0.5:
-            sum_A += new_A ; z += 1 ; N +=1
-            H_list.append(H)
-            sum_w += w
+        energy_change = new_energy - initial_energy
+        
+        if energy_change <= 0:
+            sum_mag_density += new_mag_density ; partition_function += 1 ; N +=1
+            initial_energy = new_energy
+            #H_list.append(energy)
+            sum_weight += weight
+        elif energy_change > 0 and weight >= 0.5:
+            sum_mag_density += new_mag_density ; partition_function += 1 ; N +=1
+            initial_energy = new_energy
+            #H_list.append(energy)
+            sum_weight += weight
         else: lattice_points[i,j] = -1 * lattice_points[i,j]; N += 1 
     
-    observed_A = sum_A/N   
+    observed_mag_density = sum_mag_density/N   
     
-    return observed_A, z, N
+    return observed_mag_density, partition_function, N
 
-""" FIX ACCEPTANCE CONDITION """
 
-T = np.arange(0.5,3,0.2)
+T = np.arange(0.5,5,0.25)
 T_len = len(T)
-
 
 A = np.zeros(T_len)
 std = np.zeros(T_len)
@@ -173,5 +175,5 @@ plt.plot(T,A)
 plt.xlabel("Temperature")
 plt.ylabel("Magnetisation density")
 plt.errorbar(T, A, std)
-plt.vlines(2.26, 0, 1, colors = "r", linestyles = "--", label = "Expected Critical Temperature")
+#plt.vlines(2.26, 0, 1, colors = "r", linestyles = "--", label = "Expected Critical Temperature")
 plt.title("Temperature vs. Magnetisation Density")
