@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import random as random
 from scipy.constants import Boltzmann
 
-
 def initial_state(L):
     """
     This function creates the initial state of the lattice by creating an
@@ -22,17 +21,19 @@ def initial_state(L):
         Defines the size of the lattice sides.
     """
     
-    
+    """
     lattice_points = np.zeros((L,L))
+    
+    
     up_or_down = [-1,1]
     
     for i in range(L):
         for j in range(L):
             lattice_points[i,j] = random.choice(up_or_down)
+    """
     
-    """
     lattice_points = np.ones((L,L))
-    """
+    
     
     return lattice_points, L
     
@@ -79,12 +80,13 @@ def Hamiltonian(lattice_points, L, T):
                 below = lattice_points[i, j+1]
                 
             energy += -J * reference_point * (above+below+right+left) #J is ang. mom. (high J means less magnetisation)
+            energy = energy/2
                     
     return energy
 
 
 
-def metropolis(L, flips, T):
+def metropolis(L, flips, T, r = 0.5):
     """
     This function calculates the inital parameters of the lattice and then
     randomly changes one spin at a time. If the change is accepted then the
@@ -115,20 +117,22 @@ def metropolis(L, flips, T):
     #k = Boltzmann
     k = 1
     
+    
     lattice_points, length = initial_state(L)
     initial_energy = Hamiltonian(lattice_points, length, T)
+    initial_mag_density = np.abs(np.sum(lattice_points))/(L**2)
+    plt.imshow( lattice_points , cmap = 'viridis', animated=False)
+    plt.title(f"Initial state, Energy = {initial_energy}, Mag density = {initial_mag_density}")
+    plt.show()
+
     
     #print(H)
     #print(w)
-    
     #H_list.append(energy)
-    
-    
-    #initial_mag_density = sum(sum(lattice_points))/(L**2)
     #print(A)
     #mag_densities.append(initial_mag_density); #partition_function += 1 ; N += 1
     
-    for k in range(flips):
+    for l in range(flips):
         i = random.randint(0, L-1); j = random.randint(0, L-1)
         lattice_points[i,j] = -1 * lattice_points[i,j]
         new_energy = Hamiltonian(lattice_points, L, T)
@@ -137,21 +141,32 @@ def metropolis(L, flips, T):
         
         energy_change = new_energy - initial_energy
         weight = np.exp(-energy_change/(k*T))
+        r = random.random()
         
-        if energy_change <= 0 or (energy_change > 0 and weight >= 0.5):
+        if energy_change <= 0:
             #mag_densities.append(new_mag_density) ; #partition_function += 1 ; N +=1
             initial_energy = new_energy
             #H_list.append(energy)
-        else: lattice_points[i,j] = -1 * lattice_points[i,j]; N += 1 
+        elif (energy_change > 0 and weight >= r):
+            initial_energy = new_energy
+        else: lattice_points[i,j] = -1 * lattice_points[i,j]; N += 1
+    
+
+        if l%(flips/10) == 0:
+            plt.imshow( lattice_points , cmap = 'viridis', animated=False)
+            plt.title(f"T = {T}, Flip = {l}/{flips}, E = {new_energy}")
+            plt.show()
+
+   
     
     """Check this"""
     #mean_mag_density = sum_mag_density/N
     #mean_mag = np.mean(mag_densities)
-    magnetisation = abs(sum(sum(lattice_points))/(L**2))
+    final_mag_density = np.abs(np.sum(lattice_points))/(L**2)
     
-    return magnetisation, N #, partition_function
+    return final_mag_density, N, lattice_points#, partition_function
 
-def data(T_initial, T_final, T_step, reps, L, flips):
+def data(T_initial, T_final, T_step, reps, L, flips, r = 0.5):
     """
     This function uses the metropolis functions to generate the magnetisation densities of the lattice at different temperatures, as well as the standard deviation for each.
 
@@ -188,10 +203,11 @@ def data(T_initial, T_final, T_step, reps, L, flips):
     for i in range(T_len):
         B = np.zeros(reps)
         for j in range(reps):
-            B[j] += (metropolis(L, flips, T[i])[0])
-            print(f"T = {T[i]}/T[-1], Rep {j}/{reps}")
-            A[i] = np.mean(B)
-            std[i] = np.std(B)
+            B[j] += metropolis(L, flips, T[i], r)[0]
+            print(f"T = {T[i]}/{T[-1]}, Rep {j+1}/{reps}")
+        A[i] = np.mean(B)
+        print(A[i])
+        std[i] = np.std(B)
     return T, A, std
 
 def plot(T, A, std):
@@ -201,3 +217,5 @@ def plot(T, A, std):
     plt.errorbar(T, A, std)
     #plt.vlines(2.26, 0, 1, colors = "r", linestyles = "--", label = "Expected Critical Temperature")
     plt.title("Temperature vs. Magnetisation Density")
+
+#data(0.5, 4.5, 0.5, 10, 20, 10000)
